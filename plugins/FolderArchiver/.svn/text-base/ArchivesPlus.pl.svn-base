@@ -1,0 +1,78 @@
+package MT::Plugin::ArchivePlus;
+use strict;
+use base qw( MT::Plugin );
+use MT;
+our $VERSION = '1.1';
+our $SCHEMA_VERSION = '0.1';
+my $plugin = __PACKAGE__->new( {
+ id => 'ArchivePlus',
+ key => 'archiveplus',
+ name => 'ArchivePlus',
+ description => '<__trans phrase="Folder and Tag based archiver.">',
+ author_name => 'Alfasado Inc.',
+ author_link => 'http://alfasado.net/',
+ version => $VERSION,
+ schema_version => $SCHEMA_VERSION,
+} );
+MT->add_plugin( $plugin );
+sub init_registry {
+my $plugin = shift;
+$plugin->registry( {
+ archive_types => {
+  Tag => 'TagArchives::Tag', Folder => 'FolderArchives::Folder', },
+object_types => { fileinfo => { tag_id  => 'integer', }, },
+callbacks => {
+ 'build_file_filter' => '$archiveplus::ArchivePlus::Plugin::_build_file_filter',
+ 'cms_post_delete.folder' => '$archiveplus::ArchivePlus::Plugin::_post_delete_folder',
+ 'cms_post_delete.tag' => '$archiveplus::ArchivePlus::Plugin::_post_delete_tag',
+ 'cms_post_save.entry' => { handler => '$archiveplus::ArchivePlus::Plugin::_post_save_entry', priority => 10, },
+ 'cms_post_save.page' => { handler => '$archiveplus::ArchivePlus::Plugin::_post_save_page', priority => 10, },
+ 'cms_post_save_by_listing.entry' => { handler => '$archiveplus::ArchivePlus::Plugin::_post_published_entry', priority => 10, },
+ 'cms_post_save_by_listing.page' => { handler => '$archiveplus::ArchivePlus::Plugin::_post_published_entry', priority => 10, },
+ 'scheduled_post_published' => '$archiveplus::ArchivePlus::Plugin::_post_published_entry',
+ 'scheduled_post_unpublished' => '$archiveplus::ArchivePlus::Plugin::_post_published_entry',
+ 'cms_post_delete.entry' => '$archiveplus::ArchivePlus::Plugin::_post_delete_entry',
+ 'cms_post_save.page' => { handler => '$archiveplus::ArchivePlus::Plugin::_post_save_page', priority => 10, },
+ 'cms_post_delete.page' => '$archiveplus::ArchivePlus::Plugin::_post_delete_entry',
+ 'cms_delete_permission_filter.entry' => { handler => '$archiveplus::ArchivePlus::Plugin::_pre_delete_entry', priority => 10, },
+ 'cms_delete_permission_filter.page' => { handler => '$archiveplus::ArchivePlus::Plugin::_pre_delete_page', priority => 10, },
+ 'cms_post_save.folder' => '$archiveplus::ArchivePlus::Plugin::_post_save_folder',
+ 'MT::App::CMS::template_param.edit_template' => '$archiveplus::ArchivePlus::Plugin::_edit_template_param',
+ 'cms_delete_permission_filter.tag' => '$archiveplus::ArchivePlus::Plugin::_pre_delete_tag',
+ 'MT::ObjectTag::post_remove' => '$archiveplus::ArchivePlus::Plugin::_object_tag_remove',
+ 'MT::FileInfo::post_save' => '$archiveplus::ArchivePlus::Plugin::_file_info_post_save',
+ 'cms_post_recover_from_revision.entry' => '$archiveplus::ArchivePlus::Plugin::_post_recover_entry',
+ 'cms_post_recover_from_revision.page' => '$archiveplus::ArchivePlus::Plugin::_post_recover_page', },
+tags => {
+ block => {
+  'SetFolderContext' => '$archiveplus::ArchivePlus::Plugin::_folder_context',
+  'SetTagContext' => '$archiveplus::ArchivePlus::Plugin::_tag_context', }, } } );
+}
+sub init_request {
+    my $app = MT->instance();
+    return unless ( ref $app eq 'MT::App::CMS' );
+    return unless $app->blog;
+    if ( ( $app->blog->has_column( 'class' ) ) && ( $app->blog->class eq 'website' ) ) {
+        if ( $app->mode eq 'rebuild' ) {
+            require MT::Request;
+            my $r = MT::Request->instance;
+            my $rebuild_tag = $r->cache( 'rebuild_tag' );
+            return if $rebuild_tag;
+            my $at = $app->param( 'type' );
+            my $next = $app->param( 'next' );
+            if ( ( $at =~ /,{0,1}Tag,{0,1}/ ) && ( $next eq '0' ) ) {
+                require MT::Tag; require MT::ObjectTag;
+                my @tags = MT::Tag->load( { is_private => 0 },
+                 { join => MT::ObjectTag->join_on( 'tag_id',
+                 { blog_id => $app->blog->id, object_datasource => 'entry', }, { unique => 1, } ) } );
+                if ( scalar @tags ) {
+                   _rebuild_tag_archives( $app->blog, \@tags ); $r->cache( 'rebuild_tag', 1 );
+                }
+            }
+        }
+    }
+}
+sub _rebuild_tag_archives { require ArchivePlus::Plugin; ArchivePlus::Plugin::_rebuild_tag_archives( @_ ); }
+sub _rebuild_folder_archives { require ArchivePlus::Plugin; ArchivePlus::Plugin::_rebuild_folder_archives( @_ ); }
+
+1;

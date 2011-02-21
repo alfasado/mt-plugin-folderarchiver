@@ -1,0 +1,10 @@
+package ArchivePlus::L10N::ja;
+use strict;
+use base 'ArchivePlus::L10N';
+use vars qw( %Lexicon );
+
+%Lexicon = (
+    'Folder and Tag based archiver.' => 'ウェブサイト/ブログにフォルダーアーカイブ/タグアーカイブを追加します(スタティック・パブリッシング専用です)。',
+);
+
+1;
