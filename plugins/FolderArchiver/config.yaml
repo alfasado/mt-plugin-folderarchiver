@@ -14,16 +14,16 @@ callbacks:
     build_file_filter: $folderarchiver::FolderArchiver::Plugin::_build_file_filter
     cms_post_delete.folder: $folderarchiver::FolderArchiver::Plugin::_post_delete_folder
     cms_post_save_by_listing.page:
-        - handler: $folderarchiver::FolderArchiver::Plugin::_post_published_page
-          priority: 10
+        handler: $folderarchiver::FolderArchiver::Plugin::_post_published_page
+        priority: 10
     scheduled_post_published: $folderarchiver::FolderArchiver::Plugin::_post_published_page
     # scheduled_post_unpublished: $folderarchiver::FolderArchiver::Plugin::_post_published_page
     cms_post_save.page:
-        - handler: $folderarchiver::FolderArchiver::Plugin::_post_save_page
-          priority: 10
+        handler: $folderarchiver::FolderArchiver::Plugin::_post_save_page
+        priority: 10
     cms_post_delete.page: $folderarchiver::FolderArchiver::Plugin::_post_delete_page
     cms_delete_permission_filter.page:
-        - handler: $folderarchiver::FolderArchiver::Plugin::_pre_delete_page
+          handler: $folderarchiver::FolderArchiver::Plugin::_pre_delete_page
           priority: 10
     cms_post_save.folder: $folderarchiver::FolderArchiver::Plugin::_post_save_folder
     MT::App::CMS::template_param.edit_template: $folderarchiver::FolderArchiver::Plugin::_edit_template_param
