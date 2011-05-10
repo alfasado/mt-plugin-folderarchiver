@@ -1,7 +1,7 @@
 name: Folder Archiver
 id:   FolderArchiver
 key:  folderarchiver
-version: 0.1
+version: 0.5
 author_link: https://github.com/alfasado
 author_name: Alfasado Inc.
 l10n_class: FolderArchiver::L10N
@@ -9,7 +9,7 @@ description: <__trans phrase="Folder based archiver.">
 archive_types:
     Folder: FolderArchiver::Folder
 callbacks:
-    MT::App::CMS::pre_run:  $folderarchiver::FolderArchiver::Plugin::_pre_run
+    MT::App::CMS::pre_run: $folderarchiver::FolderArchiver::Plugin::_pre_run
     MT::Page::post_save: $folderarchiver::FolderArchiver::Plugin::_call_listing_callback
     build_file_filter: $folderarchiver::FolderArchiver::Plugin::_build_file_filter
     cms_post_delete.folder: $folderarchiver::FolderArchiver::Plugin::_post_delete_folder
@@ -17,7 +17,7 @@ callbacks:
         handler: $folderarchiver::FolderArchiver::Plugin::_post_published_page
         priority: 10
     scheduled_post_published: $folderarchiver::FolderArchiver::Plugin::_post_published_page
-    # scheduled_post_unpublished: $folderarchiver::FolderArchiver::Plugin::_post_published_page
+    scheduled_post_unpublished: $folderarchiver::FolderArchiver::Plugin::_post_published_page
     cms_post_save.page:
         handler: $folderarchiver::FolderArchiver::Plugin::_post_save_page
         priority: 10
@@ -28,5 +28,9 @@ callbacks:
     cms_post_save.folder: $folderarchiver::FolderArchiver::Plugin::_post_save_folder
     MT::App::CMS::template_param.edit_template: $folderarchiver::FolderArchiver::Plugin::_edit_template_param
     cms_pre_preview.template: $folderarchiver::FolderArchiver::Plugin::_cms_pre_preview
+    MT::FileInfo::post_save: $folderarchiver::FolderArchiver::Plugin::_post_save_file_info
+    cms_post_bulk_save.folder: $folderarchiver::FolderArchiver::Plugin::_cms_post_bulk_save
+tags:
+    block:
+        SetFolderContext: $folderarchiver::FolderArchiver::Plugin::_folder_context
 
-# TODO - PHP

@@ -3,9 +3,65 @@ package FolderArchiver::Plugin;
 use File::Basename qw( dirname );
 use strict;
 
+sub _folder_context {
+    my ( $ctx, $args, $cond ) = @_;
+    my $app = MT->instance();
+    my $f = $ctx->stash( 'category' );
+    unless ( defined $f ) {
+        require MT::Folder;
+        my $blog_id = $app->blog->id;
+        my $f = MT::Folder->load( { blog_id => $blog_id }, { limit => 1 } );
+        if (! defined $f ) {
+            $f = MT::Folder->new;
+            $f->blog_id( $blog_id );
+            $f->id( 0 );
+            $f->label( $app->translate( 'Folder' ) );
+            $f->description( 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit.' );
+        } else {
+            $ctx->{ inside_mt_categories } = 1;
+        }
+        $ctx->{ __stash }{ 'category' } = $f;
+        $ctx->stash( 'category', $f );
+        $ctx->stash( 'category_id', $f->id );
+    }
+    $ctx->stash( 'builder' )->build( $ctx, $ctx->stash( 'tokens' ), $cond );
+}
+
+sub _cms_post_bulk_save {
+    my ( $cb, $app, $folders ) = @_;
+    require MT::Request;
+    my $r = MT::Request->instance;
+    my @rebuild_folders;
+    my $old_folders = $r->cache( 'bulk_update_folder_old_folders' );
+    if ( ref $folders ) {
+        for my $folder ( @$folders ) {
+            _post_save_folder( 'cb', $app, $folder, $folder );
+            push ( @rebuild_folders, $folder->id );
+        }
+    }
+    if ( ref $old_folders ) {
+        for my $folder ( @$old_folders ) {
+            my $folder_id = $folder->id;
+            if (! grep( /^$folder_id$/, @rebuild_folders ) ) {
+                _post_delete_folder( 'cb', $app, $folder, $folder );
+            }
+        }
+    }
+    return 1;
+}
+
 sub _pre_run {
     my ( $cb, $app ) = @_;
     if ( ref $app eq 'MT::App::CMS' ) {
+        if ( my $blog = $app->blog ) {
+            if ( $app->mode eq 'bulk_update_folder' ) {
+                require MT::Request;
+                require MT::Folder;
+                my $r = MT::Request->instance;
+                my @folders = MT::Folder->load( { blog_id => $blog->id } );
+                $r->cache( 'bulk_update_folder_old_folders', \@folders );
+            }
+        }
         return unless ( $app->mode eq 'delete' );
         my $type = $app->param( 'type' ) || '';
         if ( ( $type eq 'entry' ) || ( $type eq 'page' ) ) {
@@ -21,6 +77,14 @@ sub _pre_run {
                 $app->run_callbacks( 'cms_delete_permission_filter.' . $type, $app, $obj );
             }
         }
+    }
+}
+
+sub _post_save_file_info {
+    my ( $cb, $obj, $original ) = @_;
+    if ( ( $obj->archive_type eq 'Folder' ) &&
+        ( $obj->entry_id ) ) {
+        $obj->remove or die $obj->errstr;
     }
 }
 
@@ -46,7 +110,7 @@ sub _cms_pre_preview {
                 }
                 $ctx->{ __stash }{ 'category' } = $f;
                 $ctx->stash( 'category', $f );
-                $ctx->stash( 'category_id', $f );
+                $ctx->stash( 'category_id', $f->id );
             }
         }
     }
@@ -77,17 +141,26 @@ sub _call_listing_callback {
 
 sub _build_file_filter {
     my ( $eh, %args ) = @_;
-    my $at    = $args{ 'ArchiveType' };
-    my $ctx   = $args{ 'Context' };
-    my $entry = $args{ 'Entry' };
+    my $at    = $args{ ArchiveType };
+    my $entry = $args{ Entry };
+    my $map = $args{ TemplateMap };
+    my $finfo = $args{ FileInfo };
     if ( $at eq 'Folder' ) {
         if ( $entry ) {
             return 0;
         }
     }
+    if ( $at eq 'Category' ) {
+        if ( $map && $map->build_type == 3 ) {
+            if (! $finfo->virtual ) {
+                $finfo->virtual( 1 );
+                $finfo->save or die $finfo->errstr;
+            }
+            return 0;
+        }
+    }
     return 1;
 }
-
 
 sub _post_published_page {
     my ( $cb, $app, $obj ) = @_;
@@ -166,6 +239,7 @@ sub _rebuild_folder_archives {
     require MT::TemplateMap;
     require MT::Template;
     require MT::FileInfo;
+    require MT::Page;
     my @maps = MT::TemplateMap->load( { blog_id => $blog->id, archive_type => 'Folder' } );
     return unless scalar @maps;
     my @templates;
@@ -219,7 +293,7 @@ sub _post_delete_folder {
     my $blog = $app->blog;
     return 1 unless defined $blog;
     my $blog_id = $obj->blog_id;
-    my $site_path = _site_path ( $blog );
+    my $site_path = _site_path( $blog );
     require MT::TemplateMap;
     require MT::FileInfo;
     require File::Spec;
